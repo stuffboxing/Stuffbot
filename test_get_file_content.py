@@ -1,5 +1,3 @@
-from webbrowser import get
-
 from functions.get_file_content import get_file_content
 
 __working_dir = "calculator"
