@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-from functions.call_function import available_functions
+from functions.call_function import available_functions, call_function
 from prompts import system_prompt
 
 # Environment vars and check
@@ -24,7 +24,7 @@ args = parser.parse_args()
 client = genai.Client(api_key=api_key)
 messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
 response = client.models.generate_content(
-    model="gemini-2.5-flash",
+    model="gemini-2.5-flash-lite",
     contents=messages,
     config=types.GenerateContentConfig(
         system_instruction=system_prompt,
@@ -42,6 +42,7 @@ fn_call = response.function_calls
 
 # Just an output formatter
 def verbose_output(text, meta, calls=None):
+    f_result_list = []
     rvalue = (
         f"User prompt: {args.user_prompt} \n"
         f"Prompt tokens: {meta.prompt_token_count} \n"
@@ -50,15 +51,35 @@ def verbose_output(text, meta, calls=None):
     )
     if calls:
         for call in calls:
-            rvalue += f"Calling function: {call.name}({call.args})\n"
+            func_result = call_function(call, verbose=True)
+            if not func_result.parts:
+                raise Exception(f"Error: No parts in function result for call {call}")
+            if not func_result.parts[0].function_response:
+                raise Exception(f"Error: functions response of call {call} was none")
+            if not func_result.parts[0].function_response.response:
+                raise Exception(
+                    f"Error: Response of function_repsonse of call {call} was none"
+                )
+            f_result_list.append(func_result.parts[0])
+            rvalue += f"-> {func_result.parts[0].function_response.response}\n"
     return rvalue
 
 
 def output(text, calls=None):
     rvalue = f"Response:\n{text}\n"
+    f_result_list = []
     if calls:
         for call in calls:
-            rvalue += f"Calling function: {call.name}({call.args})\n"
+            func_result = call_function(call, verbose=False)
+            if not func_result.parts:
+                raise Exception(f"Error: No parts in function result for call {call}")
+            if not func_result.parts[0].function_response:
+                raise Exception(f"Error: functions response of call {call} was none")
+            if not func_result.parts[0].function_response.response:
+                raise Exception(
+                    f"Error: Response of function_repsonse of call {call} was none"
+                )
+            f_result_list.append(func_result.parts[0])
     return rvalue
 
 
